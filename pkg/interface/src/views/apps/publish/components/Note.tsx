@@ -1,72 +1,86 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, Col } from "@tlon/indigo-react";
 import ReactMarkdown from "react-markdown";
+import bigInt from 'big-integer';
+
 import { Link, RouteComponentProps } from "react-router-dom";
 import { Spinner } from "~/views/components/Spinner";
-import { Comments } from "./Comments";
+import { Comments } from "~/views/components/Comments";
 import { NoteNavigation } from "./NoteNavigation";
-import {
-  NoteId,
-  Note as INote,
-  Notebook,
-} from "~/types/publish-update";
-import { Contacts } from "~/types/contact-update";
 import GlobalApi from "~/logic/api/global";
-import { Author } from "./Author";
-import { LocalUpdateRemoteContentPolicy } from "~/types";
+import { getLatestRevision, getComments } from '~/logic/lib/publish';
+import Author from "~/views/components/Author";
+import { Contacts, GraphNode, Graph, Association, Unreads, Group } from "~/types";
 
 interface NoteProps {
   ship: string;
   book: string;
-  noteId: NoteId;
-  note: INote;
-  notebook: Notebook;
+  note: GraphNode;
+  unreads: Unreads;
+  association: Association;
+  notebook: Graph;
   contacts: Contacts;
   api: GlobalApi;
-  hideAvatars: boolean;
-  hideNicknames: boolean;
-  baseUrl?: string;
-  remoteContentPolicy: LocalUpdateRemoteContentPolicy;
+  rootUrl: string;
+  baseUrl: string;
+  group: Group;
 }
 
 export function Note(props: NoteProps & RouteComponentProps) {
   const [deleting, setDeleting] = useState(false);
-  const { notebook, note, contacts, ship, book, noteId, api, rootUrl } = props;
-  useEffect(() => {
-    api.publish.readNote(ship.slice(1), book, noteId);
-    api.publish.fetchNote(ship, book, noteId);
-  }, [ship, book, noteId]);
+
+  const { notebook, note, contacts, ship, book, api, rootUrl, baseUrl, group } = props;
+  const editCommentId = props.match.params.commentId;
 
   const deletePost = async () => {
     setDeleting(true);
-    await api.publish.delNote(ship.slice(1), book, noteId);
+    const indices = [note.post.index]
+    await api.graph.removeNodes(ship, book, indices);
     props.history.push(rootUrl);
   };
 
-  const comments = note?.comments || [];
-  const file = note?.file;
-  const newfile = file ? file.slice(file.indexOf(";>") + 2) : "";
 
-  let editPost: JSX.Element | null = null;
-  const editUrl = props.location.pathname + "/edit";
-  if (`~${window.ship}` === note?.author) {
-    editPost = (
-      <Box display="inline-block" verticalAlign='middle'>
-        <Link to={editUrl}>
-          <Text display='inline-block' color="green">Edit</Text>
-        </Link>
+  const comments = getComments(note);
+  const [revNum, title, body, post] = getLatestRevision(note);
+  const index = note.post.index.split('/');
+
+  const noteId = bigInt(index[1]);
+  useEffect(() => {
+    api.hark.markEachAsRead(props.association, '/',`/${index[1]}/1/1`, 'note', 'publish');
+  }, [props.association, props.note]);
+
+
+
+  let adminLinks: JSX.Element | null = null;
+  if (window.ship === note?.post?.author) {
+    adminLinks = (
+      <Box display="inline-block" verticalAlign="middle">
+        <Link to={`${baseUrl}/edit`}>
         <Text
-          display='inline-block'
+          color="green"
+          ml={2}
+        >
+          Update
+        </Text>
+      </Link>
+        <Text
           color="red"
           ml={2}
           onClick={deletePost}
-          css={{ cursor: "pointer" }}
+          style={{ cursor: "pointer" }}
         >
           Delete
         </Text>
       </Box>
     );
   }
+
+  const windowRef = React.useRef(null);
+  useEffect(() => {
+    if (windowRef.current) {
+      windowRef.current.parentElement.scrollTop = 0;
+    }
+  }, [windowRef, note]);
 
   return (
     <Box
@@ -79,48 +93,44 @@ export function Note(props: NoteProps & RouteComponentProps) {
       width="100%"
       gridRowGap={4}
       mx="auto"
+      ref={windowRef}
     >
       <Link to={rootUrl}>
         <Text>{"<- Notebook Index"}</Text>
       </Link>
       <Col>
-        <Text display="block" mb={2}>{note?.title || ""}</Text>
+        <Text display="block" mb={2}>{title || ""}</Text>
         <Box display="flex">
           <Author
-            hideNicknames={props?.hideNicknames}
-            hideAvatars={props?.hideAvatars}
-            ship={note?.author}
+            ship={post?.author}
             contacts={contacts}
-            date={note?.["date-created"]}
+            date={post?.["time-sent"]}
           />
-          <Text ml={2}>{editPost}</Text>
+          <Text ml={2}>{adminLinks}</Text>
         </Box>
       </Col>
-      <Box color="black" className="md" style={{ overflowWrap: "break-word" }}>
-        <ReactMarkdown source={newfile} linkTarget={"_blank"} />
+      <Box color="black" className="md" style={{ overflowWrap: "break-word", overflow: "hidden" }}>
+        <ReactMarkdown source={body} linkTarget={"_blank"} />
       </Box>
       <NoteNavigation
         notebook={notebook}
-        prevId={note?.["prev-note"] || undefined}
-        nextId={note?.["next-note"] || undefined}
-        ship={ship}
-        book={book}
+        noteId={noteId}
+        ship={props.ship}
+        book={props.book}
       />
-      {notebook?.comments && (
-        <Comments
-          ship={ship}
-          book={book}
-          noteId={noteId}
-          note={note}
-          comments={comments}
-          numComments={note?.["num-comments"]}
-          contacts={contacts}
-          api={api}
-          hideNicknames={props?.hideNicknames}
-          hideAvatars={props?.hideAvatars}
-          remoteContentPolicy={props?.remoteContentPolicy}
-        />
-      )}
+      <Comments
+        ship={ship}
+        name={props.book}
+        unreads={props.unreads}
+        comments={comments}
+        contacts={props.contacts}
+        association={props.association}
+        api={props.api}
+        baseUrl={baseUrl}
+        editCommentId={editCommentId}
+        history={props.history}
+        group={group}
+      />
       <Spinner
         text="Deleting post..."
         awaiting={deleting}

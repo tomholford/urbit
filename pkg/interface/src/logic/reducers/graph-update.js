@@ -1,6 +1,6 @@
 import _ from 'lodash';
-import { OrderedMap } from "~/logic/lib/OrderedMap";
-
+import { BigIntOrderedMap } from "~/logic/lib/BigIntOrderedMap";
+import bigInt, { BigInteger } from "big-integer";
 
 export const GraphReducer = (json, state) => {
   const data = _.get(json, 'graph-update', false);
@@ -28,23 +28,19 @@ const addGraph = (json, state) => {
   const _processNode = (node) => {
     //  is empty
     if (!node.children) {
-      node.children = new OrderedMap();
+      node.children = new BigIntOrderedMap();
       return node;
     }
 
     //  is graph
-    let converted = new OrderedMap();
-    for (let i in node.children) {
-      let item = node.children[i];
-      let index = item[0].split('/').slice(1).map((ind) => {
-        return parseInt(ind, 10);
-      });
-
-      if (index.length === 0) { break; }
+    let converted = new BigIntOrderedMap();
+    for (let idx in node.children) {
+      let item = node.children[idx];
+      let index = bigInt(idx);
       
       converted.set(
-        index[index.length - 1],
-        _processNode(item[1])
+        index,
+        _processNode(item)
       );
     }
     node.children = converted;
@@ -58,18 +54,18 @@ const addGraph = (json, state) => {
     }
 
     let resource = data.resource.ship + '/' + data.resource.name;
-    state.graphs[resource] = new OrderedMap();
+    state.graphs[resource] = new BigIntOrderedMap();
 
-    for (let i in data.graph) {
-      let item = data.graph[i];
-      let index = item[0].split('/').slice(1).map((ind) => {
-        return parseInt(ind, 10);
-      });
-
-      if (index.length === 0) { break; }
+    for (let idx in data.graph) {
+      let item = data.graph[idx];
+      let index = bigInt(idx);
       
-      let node = _processNode(item[1]);
-      state.graphs[resource].set(index[index.length - 1], node);
+      let node = _processNode(item);
+
+      state.graphs[resource].set(
+        index,
+        node
+      );
     }
     state.graphKeys.add(resource);
   }
@@ -79,19 +75,22 @@ const addGraph = (json, state) => {
 const removeGraph = (json, state) => {
   const data = _.get(json, 'remove-graph', false);
   if (data) {
+
     if (!('graphs' in state)) {
       state.graphs = {};
     }
-    let resource = data.resource.ship + '/' + data.resource.name;
+    let resource = data.ship + '/' + data.name;
+    state.graphKeys.delete(resource);
     delete state.graphs[resource];
   }
 };
 
 const mapifyChildren = (children) => {
-  return new OrderedMap(
-    children.map(([idx, node]) => {
-      const nd = {...node, children: mapifyChildren(node.children || []) }; 
-      return [parseInt(idx.slice(1), 10), nd];
+  return new BigIntOrderedMap(
+    _.map(children, (node, idx) => {
+      idx = idx && idx.startsWith('/') ? idx.slice(1) : idx;
+      const nd = {...node, children: mapifyChildren(node.children || {}) }; 
+      return [bigInt(idx), nd];
     }));
 };
 
@@ -119,25 +118,28 @@ const addNodes = (json, state) => {
     if (!('graphs' in state)) { return; }
 
     let resource = data.resource.ship + '/' + data.resource.name;
-    if (!(resource in state.graphs)) { return; }
+    if (!(resource in state.graphs)) { 
+      state.graphs[resource] = new BigIntOrderedMap();
+    }
+    state.graphKeys.add(resource);
 
-    for (let i in data.nodes) {
-      let item = data.nodes[i];
-      if (item[0].split('/').length === 0) { return; }
+    for (let index in data.nodes) {
+      let node = data.nodes[index];
+      if (index.split('/').length === 0) { return; }
 
-      let index = item[0].split('/').slice(1).map((ind) => {
-        return parseInt(ind, 10);
+      index = index.split('/').slice(1).map((ind) => {
+        return bigInt(ind);
       });
 
       if (index.length === 0) { return; }
 
-      item[1].children = mapifyChildren(item[1].children || []);
+      node.children = mapifyChildren(node?.children || {});
 
       
       state.graphs[resource] = _addNode(
         state.graphs[resource],
         index,
-        item[1]
+        node
       );
     }
   }
@@ -155,16 +157,14 @@ const removeNodes = (json, state) => {
   };
   const data = _.get(json, 'remove-nodes', false);
   if (data) {
-    console.log(data);
     const { ship, name } = data.resource;
     const res = `${ship}/${name}`;
     if (!(res in state.graphs)) { return; }
 
     data.indices.forEach((index) => {
-      console.log(index);
       if (index.split('/').length === 0) { return; }
       let indexArr = index.split('/').slice(1).map((ind) => {
-        return parseInt(ind, 10);
+        return bigInt(ind);
       });
       _remove(state.graphs[res], indexArr);
     });

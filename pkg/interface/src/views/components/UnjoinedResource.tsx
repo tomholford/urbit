@@ -20,61 +20,34 @@ interface UnjoinedResourceProps {
   inbox: Inbox;
 }
 
-function isJoined(app: string, path: string) {
+function isJoined(path: string) {
   return function (
-    props: Pick<UnjoinedResourceProps, "inbox" | "graphKeys" | "notebooks">
+    props: Pick<UnjoinedResourceProps, "graphKeys">
   ) {
-    let ship, name;
     const graphKey = path.substr(7);
-    switch (app) {
-      case "link":
-        return props.graphKeys.has(graphKey);
-      case "publish":
-        [, ship, name] = path.split("/");
-        return !!props.notebooks[ship]?.[name];
-      case "chat":
-        return !!props.inbox[path];
-      default:
-        console.log("Bad app name");
-        return false;
-    }
-  };
+    return props.graphKeys.has(graphKey);
+  }
 }
 
 export function UnjoinedResource(props: UnjoinedResourceProps) {
   const { api, notebooks, graphKeys, inbox } = props;
   const history = useHistory();
-  const appPath = props.association["app-path"];
+  const rid = props.association.resource; 
   const appName = props.association["app-name"];
   const { title, description, module } = props.association.metadata;
   const waiter = useWaitForProps(props);
   const app = useMemo(() => module || appName, [props.association]);
 
   const onJoin = async () => {
-    let ship, name;
-    switch (app) {
-      case "link":
-        [, , ship, name] = appPath.split("/");
-        await api.graph.joinGraph(ship, name);
-        break;
-      case "publish":
-        [, ship, name] = appPath.split("/");
-        await api.publish.subscribeNotebook(ship.slice(1), name);
-        break;
-      case "chat":
-        [, ship, name] = appPath.split("/");
-        await api.chat.join(ship, appPath, true);
-        break;
-      default:
-        throw new Error("Unknown resource type");
-    }
-    await waiter(isJoined(app, appPath));
-    history.push(`${props.baseUrl}/resource/${app}${appPath}`);
+    const [, , ship, name] = rid.split("/");
+    await api.graph.joinGraph(ship, name);
+    await waiter(isJoined(rid));
+    history.push(`${props.baseUrl}/resource/${app}${rid}`);
   };
 
   useEffect(() => {
-    if (isJoined(app, appPath)({ inbox, graphKeys, notebooks })) {
-      history.push(`${props.baseUrl}/resource/${app}${appPath}`);
+    if (isJoined(rid)({ graphKeys })) {
+      history.push(`${props.baseUrl}/resource/${app}${rid}`);
     }
   }, [props.association, inbox, graphKeys, notebooks]);
 
@@ -95,7 +68,7 @@ export function UnjoinedResource(props: UnjoinedResourceProps) {
           <RichText color="gray">{description}</RichText>
         </Box>
         <StatelessAsyncButton
-          name={appPath}
+          name={rid}
           primary
           width="fit-content"
           onClick={onJoin}

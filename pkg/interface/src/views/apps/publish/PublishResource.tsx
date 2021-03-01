@@ -1,5 +1,5 @@
 import React from "react";
-import { Box } from '@tlon/indigo-react';
+import { Box } from "@tlon/indigo-react";
 
 import GlobalApi from "~/logic/api/global";
 import { StoreState } from "~/logic/store/type";
@@ -15,10 +15,9 @@ type PublishResourceProps = StoreState & {
 
 export function PublishResource(props: PublishResourceProps) {
   const { association, api, baseUrl, notebooks } = props;
-  const appPath = association["app-path"];
-  const [, ship, book] = appPath.split("/");
-  const notebook = notebooks[ship]?.[book];
-  const notebookContacts = props.contacts[association["group-path"]];
+  const rid = association.resource;
+  const [, , ship, book] = rid.split("/");
+  const notebookContacts = props.contacts[association.group];
 
   return (
     <Box height="100%" width="100%" overflowY="auto">
@@ -28,17 +27,17 @@ export function PublishResource(props: PublishResourceProps) {
         book={book}
         contacts={props.contacts}
         groups={props.groups}
-        notebook={notebook}
         associations={props.associations}
+        association={association}
         notebookContacts={notebookContacts}
         rootUrl={baseUrl}
-        baseUrl={`${baseUrl}/resource/publish/${ship}/${book}`}
+        baseUrl={`${baseUrl}/resource/publish/ship/${ship}/${book}`}
         history={props.history}
         match={props.match}
         location={props.location}
-        hideAvatars={props.hideAvatars}
-        hideNicknames={props.hideNicknames}
-        remoteContentPolicy={props.remoteContentPolicy}
+        unreads={props.unreads}
+        graphs={props.graphs}
+        s3={props.s3}
       />
     </Box>
   );

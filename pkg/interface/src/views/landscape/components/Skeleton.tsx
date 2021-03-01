@@ -1,34 +1,30 @@
-import React, { ReactNode, useEffect, useMemo } from "react";
-import { Box, Text } from "@tlon/indigo-react";
-import { Link } from "react-router-dom";
+import React, { ReactNode, useEffect, useMemo } from 'react';
+import { Box, Text } from '@tlon/indigo-react';
+import { Link } from 'react-router-dom';
 
-import { Sidebar } from "./Sidebar/Sidebar";
-import { ChatHookUpdate } from "~/types/chat-hook-update";
-import { Inbox } from "~/types/chat-update";
-import { Associations } from "~/types/metadata-update";
-import { Notebooks } from "~/types/publish-update";
-import GlobalApi from "~/logic/api/global";
-import { Path, AppName } from "~/types/noun";
-import { LinkCollections } from "~/types/link-update";
-import styled from "styled-components";
-import GlobalSubscription from "~/logic/subscription/global";
-import { Workspace, Groups, Graphs, Invites } from "~/types";
-import { useChat, usePublish, useLinks } from "./Sidebar/Apps";
-import { Body } from "~/views/components/Body";
+import { Sidebar } from './Sidebar/Sidebar';
+import { Associations } from '~/types/metadata-update';
+import { Notebooks } from '~/types/publish-update';
+import GlobalApi from '~/logic/api/global';
+import { Path, AppName } from '~/types/noun';
+import { LinkCollections } from '~/types/link-update';
+import GlobalSubscription from '~/logic/subscription/global';
+import { Workspace, Groups, Graphs, Invites, Rolodex } from '~/types';
+import { useGraphModule } from './Sidebar/Apps';
+import { Body } from '~/views/components/Body';
 
 interface SkeletonProps {
+  contacts: Rolodex;
   children: ReactNode;
   recentGroups: string[];
   groups: Groups;
   associations: Associations;
-  chatSynced: ChatHookUpdate | null;
   graphKeys: Set<string>;
   graphs: Graphs;
   linkListening: Set<Path>;
   links: LinkCollections;
   notebooks: Notebooks;
   invites: Invites;
-  inbox: Inbox;
   selected?: string;
   selectedApp?: AppName;
   baseUrl: string;
@@ -37,42 +33,40 @@ interface SkeletonProps {
   subscription: GlobalSubscription;
   includeUnmanaged: boolean;
   workspace: Workspace;
-  hideSidebar?: boolean;
+  unreads: any;
 }
 
 export function Skeleton(props: SkeletonProps) {
-  const chatConfig = useChat(props.inbox, props.chatSynced);
-  const publishConfig = usePublish(props.notebooks);
-  const linkConfig = useLinks(props.graphKeys, props.graphs);
+  const graphConfig = useGraphModule(props.graphKeys, props.graphs, props.unreads.graph);
   const config = useMemo(
     () => ({
-      publish: publishConfig,
-      link: linkConfig,
-      chat: chatConfig,
+      graph: graphConfig
     }),
-    [publishConfig, linkConfig, chatConfig]
+    [graphConfig]
   );
 
   return (
     <Body
       display="grid"
-      gridTemplateColumns={["100%", "250px 1fr"]}
+      gridTemplateColumns={
+        ['100%', 'minmax(150px, 1fr) 3fr', 'minmax(250px, 1fr) 4fr']
+      }
       gridTemplateRows="100%"
     >
-      {!props.hideSidebar && (
-        <Sidebar
-          api={props.api}
-          recentGroups={props.recentGroups}
-          selected={props.selected}
-          associations={props.associations}
-          invites={props.invites}
-          apps={config}
-          baseUrl={props.baseUrl}
-          groups={props.groups}
-          mobileHide={props.mobileHide}
-          workspace={props.workspace}
-        ></Sidebar>
-      )}
+      <Sidebar
+        contacts={props.contacts}
+        api={props.api}
+        recentGroups={props.recentGroups}
+        selected={props.selected}
+        associations={props.associations}
+        invites={props.invites}
+        apps={config}
+        baseUrl={props.baseUrl}
+        groups={props.groups}
+        mobileHide={props.mobileHide}
+        workspace={props.workspace}
+        history={props.history}
+      />
       {props.children}
     </Body>
   );

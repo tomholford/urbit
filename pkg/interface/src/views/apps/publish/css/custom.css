@@ -187,11 +187,12 @@
   color:var(--gray);
 }
 
-.md p {
+.md {
   line-height: 1.5;
 }
 .md code, .md pre {
   font-family: "Source Code Pro", mono;
+  white-space: pre-wrap;
 }
 .md ul>li, .md ol>li {
   line-height: 1.5;
@@ -201,14 +202,11 @@
   border-bottom-width: 1px;
 }
 
-md img {
+.md img {
   margin-bottom: 8px;
 }
 
 @media all and (prefers-color-scheme: dark) {
-  body {
-    background-color: #333;
-  }
   .bg-black-d {
     background-color: black;
   }
@@ -267,7 +265,7 @@ md img {
     background-color: #333;
   }
   .publish .cm-s-tlon.CodeMirror {
-    background: #333;
+    background: unset;
     color: #fff;
   }
 

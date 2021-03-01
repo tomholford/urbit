@@ -20,45 +20,45 @@ function sidebarSort(
   const lastUpdated = (a: string, b: string) => {
     const aAssoc = associations[a];
     const bAssoc = associations[b];
-    const aModule = aAssoc?.metadata?.module || aAssoc?.["app-name"];
-    const bModule = bAssoc?.metadata?.module || bAssoc?.["app-name"];
+    const aAppName = aAssoc?.["app-name"];
+    const bAppName = bAssoc?.["app-name"];
 
-    const aUpdated = apps[aModule].lastUpdated(a);
-    const bUpdated = apps[bModule].lastUpdated(b);
+    const aUpdated = apps[aAppName]?.lastUpdated(a) || 0;
+    const bUpdated = apps[bAppName]?.lastUpdated(b) || 0;
 
     return bUpdated - aUpdated || alphabetical(a, b);
   };
 
   return {
     asc: alphabetical,
-    desc: (a, b) => alphabetical(b, a),
-    lastUpdated,
+    lastUpdated
   };
 }
 
 export function SidebarList(props: {
   apps: SidebarAppConfigs;
+  contacts: any;
   config: SidebarListConfig;
   associations: Associations;
   groups: Groups;
   baseUrl: string;
   group?: string;
   selected?: string;
+  workspace: Workspace;
 }) {
-  const { selected, group, config } = props;
-  const associations = {
-      ...props.associations.chat,
-      ...props.associations.publish,
-      ...props.associations.link,
-      ...props.associations.graph,
-  };
+  const { selected, group, config, workspace } = props;
+  const associations = { ...props.associations.graph };
 
   const ordered = Object.keys(associations)
     .filter((a) => {
       const assoc = associations[a];
-      return group
-        ? assoc["group-path"] === group
-        : !(assoc["group-path"] in props.associations.contacts);
+      if (workspace?.type === 'messages') {
+        return (!(assoc.group in props.associations.groups) && assoc.metadata.module === "chat");
+      } else {
+        return group
+          ? assoc.group === group
+          : (!(assoc.group in props.associations.groups) && assoc.metadata.module !== "chat");
+      }
     })
     .sort(sidebarSort(associations, props.apps)[config.sortBy]);
 
@@ -75,6 +75,8 @@ export function SidebarList(props: {
             apps={props.apps}
             hideUnjoined={config.hideUnjoined}
             groups={props.groups}
+            contacts={props.contacts}
+            workspace={workspace}
           />
         );
       })}
